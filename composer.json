@@ -1,0 +1,38 @@
+{
+    "name": "beromir/neos-studio-icon-select-editor",
+    "type": "neos-plugin",
+    "description": "The icon select editor for Neos Studio: pick an SVG icon from configured icon source directories. Registers as Medienreaktor.IconSelectEditor/Editor.",
+    "license": "GPL-3.0-or-later",
+    "keywords": [
+        "neos",
+        "neoscms",
+        "flow",
+        "editor",
+        "icons",
+        "neos-studio"
+    ],
+    "authors": [
+        {
+            "name": "Henrik Reißig",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "neos/neos": "^9.1",
+        "medienreaktor/neos-studio": "^1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Beromir\\NeosStudio\\IconSelectEditor\\": "Classes/"
+        }
+    },
+    "extra": {
+        "neos": {
+            "package-key": "Beromir.NeosStudio.IconSelectEditor"
+        },
+        "branch-alias": {
+            "dev-main": "1.0.x-dev"
+        }
+    }
+}

@@ -1,0 +1,34 @@
+Medienreaktor:
+  NeosStudio:
+    # Register this package's bundle with the Studio shell. The
+    # StudioController reads this map and injects the assets into the served
+    # SPA. Build the bundle with
+    #   cd Resources/Private/Plugin && npm install && npm run build
+    # which emits the referenced files into Resources/Public/Plugin.
+    plugins:
+      'Beromir.NeosStudio.IconSelectEditor':
+        javascript: 'resource://Beromir.NeosStudio.IconSelectEditor/Public/Plugin/plugin.js'
+        stylesheet: 'resource://Beromir.NeosStudio.IconSelectEditor/Public/Plugin/plugin.css'
+        position: 110
+
+Neos:
+  Flow:
+    mvc:
+      routes:
+        # The icon listing endpoint (see Routes.yaml) must match before the
+        # Neos backend catch-all routes.
+        'Beromir.NeosStudio.IconSelectEditor':
+          position: 'before Neos.Neos'
+
+    security:
+      authentication:
+        providers:
+          # Authenticate the icon listing endpoint with the same backend
+          # session the Studio shell itself rides on - the editor fetches it
+          # with same-origin credentials.
+          'Neos.Neos:Backend':
+            requestPatterns:
+              'Beromir.NeosStudio.IconSelectEditor:Controllers':
+                pattern: 'ControllerObjectName'
+                patternOptions:
+                  controllerObjectNamePattern: 'Beromir\NeosStudio\IconSelectEditor\Controller\.*'
