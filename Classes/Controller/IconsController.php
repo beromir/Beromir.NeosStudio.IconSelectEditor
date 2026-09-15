@@ -14,9 +14,9 @@ use Neos\Flow\Package\PackageManager;
  *
  * The classic Medienreaktor.IconSelectEditor obtains this listing through the
  * Neos UI's data source API, which the Studio plugin API does not expose - so
- * this port ships its own endpoint. It is session-authenticated the same way
- * the Studio shell itself is (see Settings.yaml / Policy.yaml): any logged-in
- * backend editor may query it.
+ * this port ships its own endpoint behind the same OAuth bearer firewall as
+ * the Studio and Neos API controllers (see Settings.yaml / Policy.yaml): any
+ * logged-in backend editor may query it through Studio's API client.
  *
  * Unlike the original data source, paths are resolved through the
  * PackageManager instead of assuming DistributionPackages/, so icon sources
@@ -25,9 +25,9 @@ use Neos\Flow\Package\PackageManager;
 class IconsController extends ActionController
 {
     /**
-     * The editor fetches with `Accept: application/json`; the base
-     * controller's default (text/html) would fail content negotiation
-     * with a 406 before the action runs.
+     * The API route and Studio client both expect JSON; declaring the media
+     * type explicitly prevents the base controller's HTML default from being
+     * selected during content negotiation.
      *
      * @var array<string>
      */
@@ -37,7 +37,7 @@ class IconsController extends ActionController
     protected PackageManager $packageManager;
 
     /**
-     * GET neos/studio/icon-select-editor/icons?sources=<json>
+     * GET api/icon-select-editor/icons?sources=<json>
      *
      * `sources` is the editor's `editorOptions.iconSources` as JSON:
      * [{"name": "Font Awesome", "path": "Vendor.Site/Private/Icons/FontAwesome/regular"}, ...]

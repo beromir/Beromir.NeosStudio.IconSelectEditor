@@ -23,10 +23,9 @@ Neos:
     security:
       authentication:
         providers:
-          # Authenticate the icon listing endpoint with the same backend
-          # session the Studio shell itself rides on - the editor fetches it
-          # with same-origin credentials.
-          'Neos.Neos:Backend':
+          # Authenticate the icon listing through Studio's OAuth API client,
+          # alongside the shell's own and Neos API controllers.
+          'Medienreaktor.NeosApi:Bearer':
             requestPatterns:
               'Beromir.NeosStudio.IconSelectEditor:Controllers':
                 pattern: 'ControllerObjectName'

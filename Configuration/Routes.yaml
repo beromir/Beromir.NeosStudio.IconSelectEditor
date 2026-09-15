@@ -1,6 +1,6 @@
 -
   name: 'Icon select editor: icon listing'
-  uriPattern: 'neos/studio/icon-select-editor/icons'
+  uriPattern: 'api/icon-select-editor/icons'
   defaults:
     '@package': 'Beromir.NeosStudio.IconSelectEditor'
     '@controller': 'Icons'

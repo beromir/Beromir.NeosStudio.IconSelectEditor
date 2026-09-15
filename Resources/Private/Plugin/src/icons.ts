@@ -1,9 +1,10 @@
+import { apiFetch } from '@medienreaktor/neos-studio'
+
 /**
  * Loading the icon listing from this package's own endpoint (see
  * Classes/Controller/IconsController.php). The classic editor went through
- * the Neos UI's data source loader; the Studio plugin API exposes no backend
- * access, so the port fetches its endpoint directly with the same backend
- * session the Studio shell itself is authenticated with.
+ * the Neos UI's data source loader; this port uses Studio's public API client
+ * so the request shares the shell's OAuth bearer token and refresh handling.
  */
 
 /** One selectable icon - the same item shape the classic data source produced. */
@@ -45,7 +46,7 @@ export function normalizeSourceConfigs(raw: unknown): SourceConfig[] {
   return configs
 }
 
-const ENDPOINT = '/neos/studio/icon-select-editor/icons'
+const ENDPOINT = '/icon-select-editor/icons'
 
 /**
  * One load per source configuration for the session - the host remounts the
@@ -68,14 +69,7 @@ export function loadIconSources(configs: SourceConfig[]): Promise<LoadedSource[]
 
 async function fetchIconSources(configs: SourceConfig[]): Promise<LoadedSource[]> {
   const query = encodeURIComponent(JSON.stringify(configs))
-  const response = await fetch(`${ENDPOINT}?sources=${query}`, {
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  })
-  if (!response.ok) {
-    throw new Error(`Loading the icon sources failed (HTTP ${response.status}).`)
-  }
-  const payload: unknown = await response.json()
+  const payload = await apiFetch<unknown>(`${ENDPOINT}?sources=${query}`)
   const sources = (payload as { sources?: unknown } | null)?.sources
   if (!Array.isArray(sources)) {
     throw new Error('Unexpected icon sources response.')
