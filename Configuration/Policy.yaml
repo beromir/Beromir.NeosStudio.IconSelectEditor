@@ -1,10 +1,11 @@
 privilegeTargets:
   'Neos\Flow\Security\Authorization\Privilege\Method\MethodPrivilege':
-    # The icon listing only reads SVG files from package resource folders,
-    # but it is still backend-only: any logged-in editor may query it, matching
-    # what the classic package's Neos UI data source was reachable to.
+    # The icon listing and single-icon endpoints only read SVG files from
+    # package resource folders, but they are still backend-only: any logged-in
+    # editor may query them, matching what the classic package's Neos UI data
+    # source was reachable to.
     'Beromir.NeosStudio.IconSelectEditor:Icons':
-      matcher: 'method(Beromir\NeosStudio\IconSelectEditor\Controller\IconsController->indexAction())'
+      matcher: 'method(Beromir\NeosStudio\IconSelectEditor\Controller\IconsController->(index|icon)Action())'
 
 roles:
   'Neos.Neos:AbstractEditor':
