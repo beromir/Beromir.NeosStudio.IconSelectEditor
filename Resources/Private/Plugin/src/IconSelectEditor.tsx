@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { PropertyEditorProps } from '@medienreaktor/neos-studio'
 import {
+  labelFromResourceUri,
   loadIconSources,
   normalizeSourceConfigs,
   type IconItem,
@@ -14,9 +15,11 @@ import { VirtualList } from './VirtualList'
  * every selection calls onCommit (and onChange, so the creation dialog's live
  * validation stays current).
  *
- * The stored value is identical to the classic editor's:
- * {resourceUri, sourceName, label}, and an empty array when cleared - one
- * node type configuration serves both interfaces.
+ * The stored value is the icon's resource URI as a plain string - an empty
+ * string when cleared - so the property is a `string`. Source name and label
+ * are not stored: both are derived from the URI (the label from the file
+ * name, the source from the loaded listing), which keeps them from going
+ * stale when icons are renamed or moved between sources.
  *
  * Differences to the classic-UI original, dictated by the Studio plugin API:
  *  - the icon listing comes from this package's own session-authenticated
@@ -26,33 +29,13 @@ import { VirtualList } from './VirtualList'
  *    dropdown - the Studio inspector is a scrollable panel and the plugin API
  *    exposes no portal/popover layer, so an overlay would clip
  *  - the selected icon is additionally previewed in the trigger button
+ *  - the classic editor stores {resourceUri, sourceName, label} in an `array`
+ *    property; this one stores the resource URI alone
  */
 
 const COLUMNS = 5
 const ROW_HEIGHT = 59
 const LIST_HEIGHT = 300
-
-/** The stored value - what the classic editor writes too. */
-interface StoredIcon {
-  resourceUri: string
-  sourceName: string
-  label: string
-}
-
-function storedIcon(value: unknown): StoredIcon | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return null
-  }
-  const candidate = value as Record<string, unknown>
-  if (typeof candidate.resourceUri !== 'string' || candidate.resourceUri === '') {
-    return null
-  }
-  return {
-    resourceUri: candidate.resourceUri,
-    sourceName: typeof candidate.sourceName === 'string' ? candidate.sourceName : '',
-    label: typeof candidate.label === 'string' ? candidate.label : '',
-  }
-}
 
 export function IconSelectEditor({
   value,
@@ -68,9 +51,11 @@ export function IconSelectEditor({
   )
   const sourcesKey = JSON.stringify(sources)
 
-  // The picked icon, seeded from the stored value (the host remounts on a
-  // subject change, which resets this).
-  const [selected, setSelected] = useState<StoredIcon | null>(() => storedIcon(value))
+  // The picked icon's resource URI, seeded from the stored value (the host
+  // remounts on a subject change, which resets this).
+  const [selected, setSelected] = useState<string>(() =>
+    typeof value === 'string' ? value : '',
+  )
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
@@ -108,11 +93,13 @@ export function IconSelectEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourcesKey])
 
-  // Once the listing arrives, start on the stored icon's source tab - like
-  // the classic editor. Deliberately not re-run on tab clicks.
+  // Once the listing arrives, start on the source tab holding the stored icon
+  // - like the classic editor. Deliberately not re-run on tab clicks.
   useEffect(() => {
     if (!loaded || !selected) return
-    const index = loaded.findIndex((source) => source.name === selected.sourceName)
+    const index = loaded.findIndex((source) =>
+      source.icons.some((icon) => icon.resourceUri === selected),
+    )
     if (index >= 0) setActiveIndex(index)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded])
@@ -163,18 +150,22 @@ export function IconSelectEditor({
     return rows
   }, [activeSource, search])
 
-  // The stored value only holds the resource URI - the markup for the trigger
-  // preview has to come from the loaded listing.
-  const selectedSvg = useMemo(() => {
+  // The stored value is only the resource URI - the markup for the trigger
+  // preview, and the source the icon belongs to, come from the listing.
+  const selectedIcon = useMemo(() => {
     if (!loaded || !selected) return null
     for (const source of loaded) {
-      const match = source.icons.find(
-        (icon) => icon.resourceUri === selected.resourceUri,
-      )
-      if (match) return match.icon
+      const match = source.icons.find((icon) => icon.resourceUri === selected)
+      if (match) return match
     }
     return null
   }, [loaded, selected])
+
+  // Derived from the file name while the listing is still loading, so the
+  // trigger labels a stored icon right away.
+  const selectedLabel = selected
+    ? selectedIcon?.label || labelFromResourceUri(selected)
+    : ''
 
   if (!sources.length) {
     return (
@@ -186,24 +177,18 @@ export function IconSelectEditor({
   }
 
   function pick(icon: IconItem) {
-    const committed: StoredIcon = {
-      resourceUri: icon.resourceUri,
-      sourceName: icon.sourceName,
-      label: icon.label,
-    }
-    setSelected(committed)
+    setSelected(icon.resourceUri)
     setOpen(false)
-    onChange?.(committed)
-    onCommit(committed)
+    onChange?.(icon.resourceUri)
+    onCommit(icon.resourceUri)
   }
 
   function clear() {
-    setSelected(null)
+    setSelected('')
     setOpen(false)
-    // The classic editor commits an empty array on deselection (the property
-    // type is `array`) - keep the wire format identical.
-    onChange?.([])
-    onCommit([])
+    // The property is a string - deselection stores the empty string.
+    onChange?.('')
+    onCommit('')
   }
 
   return (
@@ -217,15 +202,15 @@ export function IconSelectEditor({
           aria-expanded={open}
           data-empty={selected ? undefined : true}
         >
-          {selectedSvg && (
+          {selectedIcon && (
             <span
               className="bise-trigger-icon"
               aria-hidden
-              dangerouslySetInnerHTML={{ __html: selectedSvg }}
+              dangerouslySetInnerHTML={{ __html: selectedIcon.icon }}
             />
           )}
           <span className="bise-trigger-label">
-            {selected ? selected.label || selected.resourceUri : 'Select icon'}
+            {selected ? selectedLabel || selected : 'Select icon'}
           </span>
           <i
             className={`fa fa-chevron-${open ? 'up' : 'down'} bise-trigger-chevron`}
@@ -263,7 +248,7 @@ export function IconSelectEditor({
                     className="bise-tab"
                     data-active={index === clampedIndex || undefined}
                     data-selected-source={
-                      source.name === selected?.sourceName || undefined
+                      source.name === selectedIcon?.sourceName || undefined
                     }
                     onClick={() => {
                       setActiveIndex(index)
@@ -296,9 +281,7 @@ export function IconSelectEditor({
                           type="button"
                           title={icon.label}
                           className="bise-icon-button"
-                          data-selected={
-                            icon.resourceUri === selected?.resourceUri || undefined
-                          }
+                          data-selected={icon.resourceUri === selected || undefined}
                           onClick={() => pick(icon)}
                         >
                           <span

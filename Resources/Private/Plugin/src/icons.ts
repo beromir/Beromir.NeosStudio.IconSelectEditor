@@ -99,3 +99,16 @@ async function fetchIconSources(configs: SourceConfig[]): Promise<LoadedSource[]
         : [],
     }))
 }
+
+/**
+ * The label for a resource URI, mirroring the endpoint's own derivation (see
+ * IconsController: ucwords(str_replace(['-', '.', '_'], ' ', $name))). Lets
+ * the trigger label a stored icon before the listing has loaded.
+ */
+export function labelFromResourceUri(resourceUri: string): string {
+  const file = resourceUri.slice(resourceUri.lastIndexOf('/') + 1)
+  return file
+    .replace(/\.svg$/i, '')
+    .replace(/[-._]/g, ' ')
+    .replace(/(^|\s)\S/g, (match) => match.toUpperCase())
+}

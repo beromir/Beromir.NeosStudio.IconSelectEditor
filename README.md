@@ -8,7 +8,8 @@ The editor registers as `Medienreaktor.IconSelectEditor/Editor`. The
 [IconSelectEditor](https://github.com/beromir/IconSelectEditor) package
 provides the same editor for the classic Neos UI under the same id; both can
 be installed side by side, so one node type configuration serves both
-interfaces. The stored value is identical, too.
+interfaces. The stored value differs, though - this port stores a plain
+string where the classic editor stores an array (see [Usage](#usage)).
 
 ## Installation
 
@@ -25,7 +26,7 @@ Then run `composer update` in your project root and flush the Flow caches.
 ```yaml
 properties:
   icon:
-    type: array
+    type: string
     ui:
       label: 'Icon'
       reloadIfChanged: true
@@ -46,15 +47,17 @@ classic package - which only looked in `DistributionPackages/` - paths are
 resolved through the PackageManager, so icon sources inside composer-installed
 packages work as well.
 
-The following properties are stored in the database for the icon:
+The stored value is the icon's resource URI as a plain string, e.g.
+`resource://Vendor.Site/Private/Icons/FontAwesome/regular/squirrel.svg`.
+Clearing the selection stores an empty string.
 
-- `resourceUri` (e.g.
-  `resource://Vendor.Site/Private/Icons/FontAwesome/regular/squirrel.svg`)
-- `sourceName` (e.g. `Font Awesome`)
-- `label` (e.g. `Squirrel`)
-
-Clearing the selection stores an empty array - the same wire format as the
-classic editor.
+The classic editor instead stores an `array` of `resourceUri`, `sourceName`
+and `label`. Both extra fields are derived from the resource URI anyway - the
+label from the file name, the source from the configured `iconSources` - so
+this port derives them at render time instead of storing copies that go stale
+when an icon is renamed or moved to another source. Rendering gets simpler,
+too: the property goes straight into `Neos.Fusion:ResourceUri`, with no
+`.resourceUri` to pick out of an array first.
 
 ## How it works
 
@@ -75,6 +78,8 @@ folder.
 - The selected icon is additionally previewed in the trigger button.
 - **No i18n.** Labels derive from the SVG file names; translation ids are not
   resolved.
+- **The value is a plain string**, the resource URI, in a `string` property -
+  not an array. See [Usage](#usage).
 
 ## Building
 
