@@ -39,8 +39,9 @@ class IconsController extends ActionController
     /**
      * GET api/icon-select-editor/icons?sources=<json>
      *
-     * `sources` is the editor's `editorOptions.iconSources` as JSON:
+     * `sources` is a list of `editorOptions.iconSources` entries as JSON:
      * [{"name": "Font Awesome", "path": "Vendor.Site/Private/Icons/FontAwesome/regular"}, ...]
+     * The editor requests one source at a time, when its tab is shown.
      *
      * Response: {"sources": [{"name": "...", "icons": [{"label", "sourceName", "icon", "resourceUri"}, ...]}, ...]}
      * where `icon` is the SVG file's markup and `resourceUri` the stable
@@ -82,6 +83,36 @@ class IconsController extends ActionController
     }
 
     /**
+     * GET api/icon-select-editor/icon?resourceUri=<uri>
+     *
+     * A single icon by the resource URI stored on the node, so the editor can
+     * preview a stored selection without loading a whole source listing.
+     *
+     * Response: {"icon": {"label", "icon", "resourceUri"}}, or {"icon": null}
+     * when the URI does not name an SVG file inside a package's Resources
+     * folder - e.g. an icon renamed after it was picked.
+     */
+    public function iconAction(string $resourceUri): string
+    {
+        $this->response->setContentType('application/json');
+
+        $icon = null;
+        if (preg_match('#^resource://([^/]+)/(.+\.svg)$#i', $resourceUri, $matches) === 1) {
+            $file = $this->resolveResourcePath($matches[1], $matches[2]);
+            $svg = $file !== null && is_file($file) ? file_get_contents($file) : false;
+            if ($svg !== false) {
+                $icon = [
+                    'label' => $this->labelFromName(pathinfo($matches[2], PATHINFO_FILENAME)),
+                    'icon' => $svg,
+                    'resourceUri' => $resourceUri,
+                ];
+            }
+        }
+
+        return json_encode(['icon' => $icon], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    /**
      * The icons of one source path (`<PackageKey>/<path below Resources/>`,
      * e.g. "Vendor.Site/Private/Icons/FontAwesome/regular"). Unknown packages
      * and paths outside the package's Resources directory yield an empty list
@@ -95,25 +126,8 @@ class IconsController extends ActionController
         $segments = explode('/', $path);
         $packageKey = array_shift($segments);
 
-        if (!$this->packageManager->isPackageAvailable($packageKey)) {
-            return [];
-        }
-        $package = $this->packageManager->getPackage($packageKey);
-        if (!$package instanceof FlowPackageInterface) {
-            return [];
-        }
-
-        // realpath resolves symlinks and eliminates any ../ segments; the
-        // prefix check then guarantees the directory is inside the package's
-        // Resources folder, whatever the configured path contained.
-        $resourcesPath = realpath($package->getResourcesPath());
-        $directory = realpath($package->getResourcesPath() . implode('/', $segments));
-        if (
-            $resourcesPath === false
-            || $directory === false
-            || !is_dir($directory)
-            || !str_starts_with($directory . '/', $resourcesPath . '/')
-        ) {
+        $directory = $this->resolveResourcePath($packageKey, implode('/', $segments));
+        if ($directory === null || !is_dir($directory)) {
             return [];
         }
 
@@ -127,7 +141,7 @@ class IconsController extends ActionController
                 continue;
             }
             $icons[] = [
-                'label' => ucwords(str_replace(['-', '.', '_'], ' ', $matches[1])),
+                'label' => $this->labelFromName($matches[1]),
                 'sourceName' => $sourceName,
                 'icon' => $svg,
                 'resourceUri' => 'resource://' . $packageKey . '/' . implode('/', [...$segments, $file]),
@@ -135,5 +149,44 @@ class IconsController extends ActionController
         }
 
         return $icons;
+    }
+
+    /**
+     * The real path of $relativePath below a package's Resources folder, or
+     * null for unknown packages, missing paths and paths leaving that folder.
+     */
+    private function resolveResourcePath(string $packageKey, string $relativePath): ?string
+    {
+        if (!$this->packageManager->isPackageAvailable($packageKey)) {
+            return null;
+        }
+        $package = $this->packageManager->getPackage($packageKey);
+        if (!$package instanceof FlowPackageInterface) {
+            return null;
+        }
+
+        // realpath resolves symlinks and eliminates any ../ segments; the
+        // prefix check then guarantees the path is inside the package's
+        // Resources folder, whatever the request contained.
+        $resourcesPath = realpath($package->getResourcesPath());
+        $resolvedPath = realpath($package->getResourcesPath() . $relativePath);
+        if (
+            $resourcesPath === false
+            || $resolvedPath === false
+            || !str_starts_with($resolvedPath . '/', $resourcesPath . '/')
+        ) {
+            return null;
+        }
+
+        return $resolvedPath;
+    }
+
+    /**
+     * The label for an icon file name without its extension. The editor's
+     * labelFromResourceUri() mirrors this derivation.
+     */
+    private function labelFromName(string $name): string
+    {
+        return ucwords(str_replace(['-', '.', '_'], ' ', $name));
     }
 }

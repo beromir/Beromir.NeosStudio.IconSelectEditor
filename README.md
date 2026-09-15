@@ -62,13 +62,23 @@ too: the property goes straight into `Neos.Fusion:ResourceUri`, with no
 ## How it works
 
 The classic editor loads its icon listing through the Neos UI's data source
-API, which the Studio plugin API does not expose. This port therefore ships a
-small endpoint of its own (`api/icon-select-editor/icons`) that scans the
-configured source directories and returns each icon's SVG markup. The endpoint
-uses Studio's public API client and the same OAuth bearer authentication as the
-Studio and Neos API controllers. Any logged-in backend editor
-(`Neos.Neos:AbstractEditor`) may query it, and paths are validated to stay
-inside the referenced package's `Resources` folder.
+API, which the Studio plugin API does not expose. This port therefore ships two
+small endpoints of its own, using Studio's public API client and the same OAuth
+bearer authentication as the Studio and Neos API controllers:
+
+- `api/icon-select-editor/icons` scans source directories and returns each
+  icon's SVG markup.
+- `api/icon-select-editor/icon` returns a single icon by its resource URI.
+
+Nothing is loaded until the picker is opened, and then only the listing of the
+active source tab - a set like Font Awesome's regular style is several
+megabytes of SVG markup. A stored icon is previewed in the trigger through the
+single-icon endpoint instead. Loaded listings and icons are cached for the
+Studio session.
+
+Any logged-in backend editor (`Neos.Neos:AbstractEditor`) may query the
+endpoints, and paths are validated to stay inside the referenced package's
+`Resources` folder.
 
 ## Differences to the classic UI original
 

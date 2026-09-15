@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import type { PropertyEditorProps } from '@medienreaktor/neos-studio'
 import {
   labelFromResourceUri,
-  loadIconSources,
+  loadIcon,
+  loadIconSource,
   normalizeSourceConfigs,
+  peekIcon,
+  peekIconSource,
+  sourceIndexForResourceUri,
   type IconItem,
-  type LoadedSource,
+  type SourceConfig,
 } from './icons'
 import { VirtualList } from './VirtualList'
 
@@ -18,12 +22,14 @@ import { VirtualList } from './VirtualList'
  * The stored value is the icon's resource URI as a plain string - an empty
  * string when cleared - so the property is a `string`. Source name and label
  * are not stored: both are derived from the URI (the label from the file
- * name, the source from the loaded listing), which keeps them from going
- * stale when icons are renamed or moved between sources.
+ * name, the source from the configured source paths), which keeps them from
+ * going stale when icons are renamed or moved between sources.
  *
  * Differences to the classic-UI original, dictated by the Studio plugin API:
- *  - the icon listing comes from this package's own OAuth-authenticated API
- *    endpoint instead of the Neos UI data source API
+ *  - icons come from this package's own OAuth-authenticated API endpoints
+ *    instead of the Neos UI data source API, and load lazily: nothing until
+ *    the picker opens, then one source listing per tab shown. The trigger
+ *    previews a stored icon through a single-icon request.
  *  - the picker expands in-flow below the trigger instead of overlaying as a
  *    dropdown - the Studio inspector is a scrollable panel and the plugin API
  *    exposes no portal/popover layer, so an overlay would clip
@@ -48,7 +54,6 @@ export function IconSelectEditor({
     () => normalizeSourceConfigs(options.iconSources),
     [options.iconSources],
   )
-  const sourcesKey = JSON.stringify(sources)
 
   // The picked icon's resource URI, seeded from the stored value (the host
   // remounts on a subject change, which resets this).
@@ -57,32 +62,44 @@ export function IconSelectEditor({
   )
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [activeIndex, setActiveIndex] = useState(0)
-  const [loaded, setLoaded] = useState<LoadedSource[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // Start on the source tab holding the stored icon - like the classic editor.
+  const [activeIndex, setActiveIndex] = useState(() =>
+    Math.max(0, sourceIndexForResourceUri(sources, selected)),
+  )
+  const [error, setError] = useState<{ path: string; message: string } | null>(null)
+  // Loads settle into the caches in ./icons, which rendering reads directly -
+  // this only triggers the render that picks them up.
+  const [, rerender] = useReducer((count: number) => count + 1, 0)
 
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const searchRef = useRef<HTMLInputElement | null>(null)
 
+  const clampedIndex = Math.min(activeIndex, Math.max(0, sources.length - 1))
+  const activeSource: SourceConfig | undefined = sources[clampedIndex]
+  const activeIcons = activeSource ? peekIconSource(activeSource) : undefined
+  const activeError = error && error.path === activeSource?.path ? error.message : null
+
   useEffect(() => {
     if (autoFocus) triggerRef.current?.focus()
   }, [autoFocus])
 
+  // Load the active tab's listing only while the picker is open - a source
+  // can be megabytes of SVG markup, and most edits never open the picker.
   useEffect(() => {
-    if (!sources.length) {
-      return
-    }
+    if (!open || !activeSource || peekIconSource(activeSource)) return
     let cancelled = false
-    setLoaded(null)
     setError(null)
-    loadIconSources(sources).then(
-      (result) => {
-        if (!cancelled) setLoaded(result)
+    loadIconSource(activeSource).then(
+      () => {
+        if (!cancelled) rerender()
       },
       (loadError: unknown) => {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : String(loadError))
+          setError({
+            path: activeSource.path,
+            message: loadError instanceof Error ? loadError.message : String(loadError),
+          })
         }
       },
     )
@@ -90,18 +107,25 @@ export function IconSelectEditor({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourcesKey])
+  }, [open, activeSource?.path])
 
-  // Once the listing arrives, start on the source tab holding the stored icon
-  // - like the classic editor. Deliberately not re-run on tab clicks.
+  // The stored value is only the resource URI - the trigger preview fetches
+  // that one icon's markup instead of its whole source listing. Picked icons
+  // are already known from the listing they were picked from.
   useEffect(() => {
-    if (!loaded || !selected) return
-    const index = loaded.findIndex((source) =>
-      source.icons.some((icon) => icon.resourceUri === selected),
+    if (!selected || peekIcon(selected) !== undefined) return
+    let cancelled = false
+    loadIcon(selected).then(
+      () => {
+        if (!cancelled) rerender()
+      },
+      // Without markup the trigger keeps showing the derived label.
+      () => {},
     )
-    if (index >= 0) setActiveIndex(index)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded])
+    return () => {
+      cancelled = true
+    }
+  }, [selected])
 
   // While open: close on a click outside or Escape.
   useEffect(() => {
@@ -133,11 +157,8 @@ export function IconSelectEditor({
     if (open) searchRef.current?.focus()
   }, [open])
 
-  const clampedIndex = loaded ? Math.min(activeIndex, Math.max(0, loaded.length - 1)) : 0
-  const activeSource = loaded?.[clampedIndex]
-
   const iconRows = useMemo(() => {
-    const icons = activeSource?.icons ?? []
+    const icons = activeIcons ?? []
     const query = search.trim().toLowerCase()
     const filtered = query
       ? icons.filter((icon) => icon.label.toLowerCase().includes(query))
@@ -147,20 +168,12 @@ export function IconSelectEditor({
       rows.push(filtered.slice(i, i + COLUMNS))
     }
     return rows
-  }, [activeSource, search])
+  }, [activeIcons, search])
 
-  // The stored value is only the resource URI - the markup for the trigger
-  // preview, and the source the icon belongs to, come from the listing.
-  const selectedIcon = useMemo(() => {
-    if (!loaded || !selected) return null
-    for (const source of loaded) {
-      const match = source.icons.find((icon) => icon.resourceUri === selected)
-      if (match) return match
-    }
-    return null
-  }, [loaded, selected])
+  const selectedIcon = selected ? peekIcon(selected) : null
+  const selectedSourceIndex = sourceIndexForResourceUri(sources, selected)
 
-  // Derived from the file name while the listing is still loading, so the
+  // Derived from the file name while the markup is still loading, so the
   // trigger labels a stored icon right away.
   const selectedLabel = selected
     ? selectedIcon?.label || labelFromResourceUri(selected)
@@ -231,76 +244,70 @@ export function IconSelectEditor({
 
       {open && (
         <div className="bise-panel">
-          {error ? (
-            <div className="bise-notice bise-notice--error">{error}</div>
-          ) : !loaded ? (
+          <div className="bise-tabs">
+            {sources.map((source, index) => (
+              <button
+                key={`${source.name}-${index}`}
+                type="button"
+                className="bise-tab"
+                data-active={index === clampedIndex || undefined}
+                data-selected-source={index === selectedSourceIndex || undefined}
+                onClick={() => {
+                  setActiveIndex(index)
+                  setSearch('')
+                }}
+              >
+                {source.name}
+              </button>
+            ))}
+          </div>
+          <input
+            ref={searchRef}
+            className="bise-search"
+            type="text"
+            placeholder="Search..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {activeError ? (
+            <div className="bise-notice bise-notice--error">{activeError}</div>
+          ) : !activeIcons ? (
             <div className="bise-loading" title="Loading">
               <i className="fa fa-spinner fa-spin fa-lg" aria-hidden />
             </div>
-          ) : (
-            <>
-              <div className="bise-tabs">
-                {loaded.map((source, index) => (
-                  <button
-                    key={`${source.name}-${index}`}
-                    type="button"
-                    className="bise-tab"
-                    data-active={index === clampedIndex || undefined}
-                    data-selected-source={
-                      source.name === selectedIcon?.sourceName || undefined
-                    }
-                    onClick={() => {
-                      setActiveIndex(index)
-                      setSearch('')
-                    }}
-                  >
-                    {source.name}
-                  </button>
-                ))}
-              </div>
-              <input
-                ref={searchRef}
-                className="bise-search"
-                type="text"
-                placeholder="Search..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
-              {iconRows.length ? (
-                <VirtualList
-                  rowCount={iconRows.length}
-                  rowHeight={ROW_HEIGHT}
-                  height={Math.min(LIST_HEIGHT, iconRows.length * ROW_HEIGHT)}
-                  resetKey={`${clampedIndex}|${search}`}
-                  renderRow={(index) => (
-                    <div className="bise-row">
-                      {(iconRows[index] ?? []).map((icon) => (
-                        <button
-                          key={icon.resourceUri}
-                          type="button"
-                          title={icon.label}
-                          className="bise-icon-button"
-                          data-selected={icon.resourceUri === selected || undefined}
-                          onClick={() => pick(icon)}
-                        >
-                          <span
-                            className="bise-icon"
-                            aria-hidden
-                            dangerouslySetInnerHTML={{ __html: icon.icon }}
-                          />
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                />
-              ) : (
-                <div className="bise-empty">
-                  {search
-                    ? 'No icons match the search.'
-                    : 'No icons found in this source - check the editorOptions.iconSources path.'}
+          ) : iconRows.length ? (
+            <VirtualList
+              rowCount={iconRows.length}
+              rowHeight={ROW_HEIGHT}
+              height={Math.min(LIST_HEIGHT, iconRows.length * ROW_HEIGHT)}
+              resetKey={`${clampedIndex}|${search}`}
+              renderRow={(index) => (
+                <div className="bise-row">
+                  {(iconRows[index] ?? []).map((icon) => (
+                    <button
+                      key={icon.resourceUri}
+                      type="button"
+                      title={icon.label}
+                      className="bise-icon-button"
+                      data-selected={icon.resourceUri === selected || undefined}
+                      onClick={() => pick(icon)}
+                    >
+                      <span
+                        className="bise-icon"
+                        aria-hidden
+                        dangerouslySetInnerHTML={{ __html: icon.icon }}
+                      />
+                    </button>
+                  ))}
                 </div>
               )}
-            </>
+            />
+          ) : (
+            <div className="bise-empty">
+              {search
+                ? 'No icons match the search.'
+                : 'No icons found in this source - check the editorOptions.iconSources path.'}
+            </div>
           )}
         </div>
       )}
