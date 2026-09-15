@@ -63,12 +63,12 @@ too: the property goes straight into `Neos.Fusion:ResourceUri`, with no
 
 The classic editor loads its icon listing through the Neos UI's data source
 API, which the Studio plugin API does not expose. This port therefore ships a
-small endpoint of its own (`neos/studio/icon-select-editor/icons`) that scans
-the configured source directories and returns each icon's SVG markup. The
-endpoint is session-authenticated the same way the Studio shell itself is:
-any logged-in backend editor (`Neos.Neos:AbstractEditor`) may query it, and
-paths are validated to stay inside the referenced package's `Resources`
-folder.
+small endpoint of its own (`api/icon-select-editor/icons`) that scans the
+configured source directories and returns each icon's SVG markup. The endpoint
+uses Studio's public API client and the same OAuth bearer authentication as the
+Studio and Neos API controllers. Any logged-in backend editor
+(`Neos.Neos:AbstractEditor`) may query it, and paths are validated to stay
+inside the referenced package's `Resources` folder.
 
 ## Differences to the classic UI original
 

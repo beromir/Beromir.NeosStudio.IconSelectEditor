@@ -22,9 +22,8 @@ import { VirtualList } from './VirtualList'
  * stale when icons are renamed or moved between sources.
  *
  * Differences to the classic-UI original, dictated by the Studio plugin API:
- *  - the icon listing comes from this package's own session-authenticated
- *    endpoint instead of the Neos UI data source API (not available to
- *    Studio plugins)
+ *  - the icon listing comes from this package's own OAuth-authenticated API
+ *    endpoint instead of the Neos UI data source API
  *  - the picker expands in-flow below the trigger instead of overlaying as a
  *    dropdown - the Studio inspector is a scrollable panel and the plugin API
  *    exposes no portal/popover layer, so an overlay would clip
