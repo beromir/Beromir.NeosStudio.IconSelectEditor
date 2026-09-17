@@ -1,4 +1,14 @@
 -
+  name: 'Icon select editor: source definitions'
+  uriPattern: 'api/icon-select-editor/sources'
+  defaults:
+    '@package': 'Beromir.NeosStudio.IconSelectEditor'
+    '@controller': 'Icons'
+    '@action': 'sources'
+    '@format': 'json'
+  httpMethods: ['GET']
+
+-
   name: 'Icon select editor: icon listing'
   uriPattern: 'api/icon-select-editor/icons'
   defaults:

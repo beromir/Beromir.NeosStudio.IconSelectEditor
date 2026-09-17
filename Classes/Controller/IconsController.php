@@ -14,8 +14,8 @@ use Neos\Flow\Package\PackageManager;
  *
  * The classic Medienreaktor.IconSelectEditor obtains this listing through the
  * Neos UI's data source API, which the Studio plugin API does not expose - so
- * this port ships its own endpoint behind the same OAuth bearer firewall as
- * the Studio and Neos API controllers (see Settings.yaml / Policy.yaml): any
+ * this port ships its own endpoints behind the same OAuth bearer firewall as
+ * the Studio and Neos API controllers (see Settings.Flow.yaml / Policy.yaml): any
  * logged-in backend editor may query it through Studio's API client.
  *
  * Unlike the original data source, paths are resolved through the
@@ -36,6 +36,45 @@ class IconsController extends ActionController
     #[Flow\Inject]
     protected PackageManager $packageManager;
 
+    /** @var array<string, array<string, mixed>> */
+    #[Flow\InjectConfiguration(path: 'sources', package: 'Beromir.NeosStudio.IconSelectEditor')]
+    protected array $configuredSources = [];
+
+    #[Flow\InjectConfiguration(path: 'defaultSource', package: 'Beromir.NeosStudio.IconSelectEditor')]
+    protected string $defaultSource = '';
+
+    /** The globally configured source definitions used by the picker. */
+    public function sourcesAction(): string
+    {
+        $this->response->setContentType('application/json');
+
+        $sources = [];
+        foreach ($this->configuredSources as $key => $configuration) {
+            if (!is_string($key) || preg_match('/^[a-zA-Z0-9_-]+$/', $key) !== 1 || !is_array($configuration)) {
+                continue;
+            }
+            $resourcePath = is_string($configuration['resourcePath'] ?? $configuration['previewPath'] ?? null)
+                ? trim($configuration['resourcePath'] ?? $configuration['previewPath'], '/') : '';
+            $pathSegments = explode('/', $resourcePath);
+            $packageKey = array_shift($pathSegments);
+            $directory = $resourcePath !== ''
+                ? $this->resolveResourcePath($packageKey, implode('/', $pathSegments)) : null;
+            $sources[$key] = [
+                'name' => isset($configuration['name']) && is_string($configuration['name'])
+                    ? $configuration['name'] : $key,
+                'previewPath' => isset($configuration['previewPath']) && is_string($configuration['previewPath'])
+                    ? trim($configuration['previewPath'], '/') : '',
+                'resourcePath' => $resourcePath,
+                'resourcePathAvailable' => $directory !== null && is_dir($directory),
+            ];
+        }
+
+        return json_encode([
+            'sources' => $sources,
+            'defaultSource' => $this->defaultSource,
+        ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
     /**
      * GET api/icon-select-editor/icons?sources=<json>
      *
@@ -44,8 +83,9 @@ class IconsController extends ActionController
      * The editor requests one source at a time, when its tab is shown.
      *
      * Response: {"sources": [{"name": "...", "icons": [{"label", "sourceName", "icon", "resourceUri"}, ...]}, ...]}
-     * where `icon` is the SVG file's markup and `resourceUri` the stable
-     * `resource://<Package>/<path>/<file>.svg` URI that gets stored on the node.
+     * where `icon` is the SVG file's markup and `resourceUri` identifies its
+     * preview SVG. The editor decides whether to store that URI, its name, or
+     * a source-prefixed name.
      */
     public function indexAction(string $sources = '[]'): string
     {
@@ -85,8 +125,8 @@ class IconsController extends ActionController
     /**
      * GET api/icon-select-editor/icon?resourceUri=<uri>
      *
-     * A single icon by the resource URI stored on the node, so the editor can
-     * preview a stored selection without loading a whole source listing.
+     * A single icon by its preview resource URI, so the editor can show a
+     * stored selection without loading a whole source listing.
      *
      * Response: {"icon": {"label", "icon", "resourceUri"}}, or {"icon": null}
      * when the URI does not name an SVG file inside a package's Resources
