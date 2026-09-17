@@ -1,0 +1,8 @@
+Beromir:
+  NeosStudio:
+    IconSelectEditor:
+      # Each source can define a picker previewPath and a resourcePath used
+      # by IconSelect.resourceUri(). A missing resourcePath uses previewPath.
+      sources: {}
+      # Optional source used for stored names without a prefix.
+      defaultSource: ''

@@ -1,0 +1,20 @@
+Neos:
+  Flow:
+    mvc:
+      routes:
+        # The icon editor endpoints (see Routes.yaml) must match before the
+        # Neos backend catch-all routes.
+        'Beromir.NeosStudio.IconSelectEditor':
+          position: 'before Neos.Neos'
+
+    security:
+      authentication:
+        providers:
+          # Authenticate the icon listing through Studio's OAuth API client,
+          # alongside the shell's own and Neos API controllers.
+          'Medienreaktor.NeosApi:Bearer':
+            requestPatterns:
+              'Beromir.NeosStudio.IconSelectEditor:Controllers':
+                pattern: 'ControllerObjectName'
+                patternOptions:
+                  controllerObjectNamePattern: 'Beromir\NeosStudio\IconSelectEditor\Controller\.*'
