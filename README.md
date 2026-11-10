@@ -13,6 +13,9 @@ its own value options, while the classic editor stores an array (see
 
 ## Installation
 
+Requires Neos Studio 2 (`medienreaktor/neos-studio` `^2.0`) with Neos `^9.2`
+and PHP `^8.4`. For Neos Studio 1, use version 2.x of this package.
+
 Run the following command in your site package:
 
 ```bash
@@ -138,8 +141,9 @@ renamed or moved.
 
 The classic editor loads its icon listing through the Neos UI's data source
 API, which the Studio plugin API does not expose. This port therefore ships
-endpoints of its own, using Studio's public API client and the same OAuth
-bearer authentication as the Studio and Neos API controllers:
+endpoints of its own below `/api/`, which Neos.Api protects with the
+`Neos.OAuth:Bearer` authentication provider, so Studio's API client reaches
+them with its own OAuth bearer token:
 
 - `api/icon-select-editor/sources` returns the global source definitions when
   a property references source keys. The response is cached for the Studio
@@ -184,11 +188,13 @@ npm run build        # emits Resources/Public/Plugin/{plugin.js,plugin.css}
 Then flush Flow caches and reload `/neos/studio`. Use `npm run dev` to rebuild
 on change while developing.
 
-Note: `@medienreaktor/neos-studio` (type declarations of the Studio plugin
-API) is a `file:` dependency pointing at the installed
-`Medienreaktor.NeosStudio` package under `Packages/Application/`. If your
-Studio package lives elsewhere, adjust the path in
-`Resources/Private/Plugin/package.json`.
+Note: the type declarations of the Studio plugin API
+(`@medienreaktor/neos-studio`) are mapped in
+`Resources/Private/Plugin/tsconfig.json` to
+`Resources/Public/Studio/types/index.d.ts` of the installed
+`Medienreaktor.NeosStudio` package under `Packages/Application/`, as seen from
+`DistributionPackages/Beromir.NeosStudio.IconSelectEditor`. If your packages
+live elsewhere, adjust the path there.
 
 ## License
 

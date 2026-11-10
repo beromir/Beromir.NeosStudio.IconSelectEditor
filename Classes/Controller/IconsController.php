@@ -14,9 +14,10 @@ use Neos\Flow\Package\PackageManager;
  *
  * The classic Medienreaktor.IconSelectEditor obtains this listing through the
  * Neos UI's data source API, which the Studio plugin API does not expose - so
- * this port ships its own endpoints behind the same OAuth bearer firewall as
- * the Studio and Neos API controllers (see Settings.Flow.yaml / Policy.yaml): any
- * logged-in backend editor may query it through Studio's API client.
+ * this port ships its own endpoints below /api/, where Neos.Api authenticates
+ * every request through Neos.OAuth's bearer provider (see Routes.yaml /
+ * Policy.yaml): any logged-in backend editor may query it through Studio's API
+ * client.
  *
  * Unlike the original data source, paths are resolved through the
  * PackageManager instead of assuming DistributionPackages/, so icon sources

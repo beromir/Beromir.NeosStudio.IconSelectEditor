@@ -18,9 +18,9 @@
         }
     ],
     "require": {
-        "php": "^8.2",
-        "neos/neos": "^9.1",
-        "medienreaktor/neos-studio": "^1.0"
+        "php": "^8.4",
+        "neos/neos": "^9.2",
+        "medienreaktor/neos-studio": "^2.0"
     },
     "autoload": {
         "psr-4": {
@@ -32,7 +32,7 @@
             "package-key": "Beromir.NeosStudio.IconSelectEditor"
         },
         "branch-alias": {
-            "dev-main": "1.0.x-dev"
+            "dev-main": "3.0.x-dev"
         }
     }
 }

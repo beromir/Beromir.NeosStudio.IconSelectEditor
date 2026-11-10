@@ -10,14 +10,13 @@
     "build": "tsc && vite build",
     "dev": "vite build --watch"
   },
-  "comment": "@medienreaktor/neos-studio provides the plugin API TYPES only (generated from the shell); at runtime it and react/react-dom are marked external in vite.config.ts and resolved from the shell's copy on window (see src/main.tsx). All build/type-time only. Keep react majors aligned with the host so types match.",
+  "comment": "The Studio plugin API TYPES come from the installed Medienreaktor.NeosStudio package (tsconfig.json paths); at runtime it and react/react-dom are marked external in vite.config.ts and resolved from the shell's copy on window (see src/main.tsx). All build/type-time only. Keep react majors aligned with the host so types match.",
   "devDependencies": {
-    "@medienreaktor/neos-studio": "file:../../../../../Packages/Application/Medienreaktor.NeosStudio/Resources/Private/StudioApi",
-    "@types/react": "^19.2.17",
-    "@types/react-dom": "^19.2.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.0.3",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "typescript": "^7.0.2",
     "vite": "^8.1.4"
   }

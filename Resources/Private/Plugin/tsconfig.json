@@ -5,7 +5,6 @@
     "lib": ["ES2021", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "preserveSymlinks": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
@@ -13,7 +12,13 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@medienreaktor/neos-studio": ["../../../../../Packages/Application/Medienreaktor.NeosStudio/Resources/Public/Studio/types/index.d.ts"],
+      "react": ["./node_modules/@types/react"],
+      "react/*": ["./node_modules/@types/react/*"],
+      "react-dom": ["./node_modules/@types/react-dom"]
+    }
   },
   "include": ["src"]
 }
